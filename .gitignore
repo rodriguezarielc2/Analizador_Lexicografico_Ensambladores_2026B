@@ -1,0 +1,18 @@
+# Python build products and caches
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local environments
+.venv/
+venv/
+env/
+
+# Packaging output and generated executables
+dist/
+build/
+*.spec
+Fase1/dist/
