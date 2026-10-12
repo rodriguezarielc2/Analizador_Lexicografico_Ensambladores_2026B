@@ -14,7 +14,7 @@ python main.py
 
 Usa **Abrir .asm** para cargar un archivo. **Analizar** vuelve a procesar el contenido actual. Los `INCLUDE` se buscan primero en la carpeta del archivo principal.
 
-## Qué muestra
+## ¿Qué muestra?
 
 - **Etapa 1:** lexemas, categoría y valor; los separadores de coma internos se ocultan en la tabla.
 - **Etapa 2:** errores con línea, fase, código y mensaje. Si hay un error que impida ensamblar, no aparece código máquina parcial.
