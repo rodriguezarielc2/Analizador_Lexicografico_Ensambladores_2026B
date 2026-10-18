@@ -60,7 +60,7 @@ internal static class AnalysisCoreTests
         List<Lexeme> items = AnalysisCore.Analyze("db 42, 0FFh, 101b, 0x20, 'A', \"texto\"", new string[0]);
         Equal(7, items.Count, "cantidad de constantes y pseudoinstruccion");
         Equal("Pseudoinstrucci\u00f3n", items[0].Type, "db");
-        Equal("Constante decimal", items[1].Type, "decimal");
+        Equal("Constante num\u00e9rico decimal", items[1].Type, "decimal");
         Equal("Constante hexadecimal", items[2].Type, "hexadecimal sufijo");
         Equal("Constante binaria", items[3].Type, "binaria sufijo");
         Equal("Constante hexadecimal", items[4].Type, "hexadecimal prefijo");
@@ -68,7 +68,7 @@ internal static class AnalysisCoreTests
         Equal("Constante de cadena", items[6].Type, "cadena");
 
         List<Lexeme> signed = AnalysisCore.Analyze("db -12, +0FFh, -101b", new string[0]);
-        Equal("Constante decimal", signed[1].Type, "decimal con signo");
+        Equal("Constante num\u00e9rico decimal", signed[1].Type, "decimal con signo");
         Equal("Constante hexadecimal", signed[2].Type, "hexadecimal con signo");
         Equal("Constante binaria", signed[3].Type, "binaria con signo");
     }
@@ -97,6 +97,18 @@ internal static class AnalysisCoreTests
         Equal("[bp]", items[6].Text, "direccion entre corchetes");
         Equal("2 dup(1, 2 dup(0))", items[7].Text, "DUP anidado");
         Equal("Pseudoinstrucci\u00f3n", items[7].Type, "DUP como pseudoinstruccion");
+
+        List<Lexeme> nonCompoundPointer = AnalysisCore.Analyze("dword ptr [bx]", new string[0]);
+        Equal(3, nonCompoundPointer.Count, "dword ptr no se agrupa como compuesto");
+        Equal("dword", nonCompoundPointer[0].Text, "dword se separa");
+        Equal("ptr", nonCompoundPointer[1].Text, "ptr se separa");
+        Equal("[bx]", nonCompoundPointer[2].Text, "los corchetes siguen agrupados");
+
+        List<Lexeme> hashDelimiters = AnalysisCore.Analyze("#dato#", new string[0]);
+        Equal(3, hashDelimiters.Count, "# no es un compuesto indicado en Moodle");
+        Equal("Elemento no identificado", hashDelimiters[0].Type, "# inicial no identificado");
+        Equal("S\u00edmbolo", hashDelimiters[1].Type, "contenido del # se analiza por separado");
+        Equal("Elemento no identificado", hashDelimiters[2].Type, "# final no identificado");
     }
 
     private static void InvalidElements()

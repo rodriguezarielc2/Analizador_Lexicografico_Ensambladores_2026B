@@ -41,7 +41,7 @@ namespace AnalizadorFase1
         private static readonly Regex SegmentPhrase = new Regex(
             @"^\.(?:code|data|stack)\s+segment\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly Regex PointerPhrase = new Regex(
-            @"^(?:byte|word|dword)\s+ptr\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+            @"^(?:byte|word)\s+ptr\b", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly Regex HexSuffix = new Regex(
             @"^[+-]?[0-9][0-9a-f]*h$", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         private static readonly Regex HexPrefix = new Regex(
@@ -175,20 +175,6 @@ namespace AnalizadorFase1
                         : "Constante de cadena";
                     Add(items, lineNumber, index + 1, text, type);
                     index = quoteEnd + 1;
-                    continue;
-                }
-
-                if (current == '#')
-                {
-                    int close = line.IndexOf('#', index + 1);
-                    if (close < 0)
-                    {
-                        Add(items, lineNumber, index + 1, line.Substring(index), "Elemento inv\u00e1lido");
-                        break;
-                    }
-                    string text = line.Substring(index, close - index + 1);
-                    Add(items, lineNumber, index + 1, text, "Pseudoinstrucci\u00f3n");
-                    index = close + 1;
                     continue;
                 }
 
@@ -353,7 +339,7 @@ namespace AnalizadorFase1
 
             if (HexPrefix.IsMatch(text) || HexSuffix.IsMatch(text)) return "Constante hexadecimal";
             if (BinaryPrefix.IsMatch(text) || BinarySuffix.IsMatch(text)) return "Constante binaria";
-            if (Decimal.IsMatch(text)) return "Constante decimal";
+            if (Decimal.IsMatch(text)) return "Constante num\u00e9rico decimal";
             if (Char.IsDigit(text[0]) || ((text[0] == '+' || text[0] == '-') && text.Length > 1 && Char.IsDigit(text[1])))
                 return "Elemento inv\u00e1lido";
             if (text == "?") return "Constante no inicializada";

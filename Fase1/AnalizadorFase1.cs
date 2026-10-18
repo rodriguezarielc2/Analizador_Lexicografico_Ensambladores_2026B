@@ -22,6 +22,9 @@ namespace AnalizadorFase1
     {
         private const int SourceLinesPerPage = 25;
         private const int ElementsPerPage = 50;
+        private const int MinimumZoomPercent = 80;
+        private const int MaximumZoomPercent = 150;
+        private const int ZoomStepPercent = 10;
 
         private readonly Label _fileLabel;
         private readonly Label _statusLabel;
@@ -33,6 +36,9 @@ namespace AnalizadorFase1
         private readonly Button _sourceNext;
         private readonly Button _elementsPrevious;
         private readonly Button _elementsNext;
+        private readonly Button _zoomOutButton;
+        private readonly Button _zoomResetButton;
+        private readonly Button _zoomInButton;
         private readonly ToolTip _toolTip;
 
         private readonly List<string> _assignedInstructions;
@@ -42,6 +48,7 @@ namespace AnalizadorFase1
         private string _filePath;
         private int _sourcePage;
         private int _elementsPage;
+        private int _zoomPercent = 100;
 
         public MainForm()
         {
@@ -64,8 +71,13 @@ namespace AnalizadorFase1
             _sourceNext = new Button();
             _elementsPrevious = new Button();
             _elementsNext = new Button();
+            _zoomOutButton = new Button();
+            _zoomResetButton = new Button();
+            _zoomInButton = new Button();
 
             BuildWindow();
+            _sourceView.Resize += delegate { ShowSourcePage(); };
+            _elementsGrid.Resize += delegate { ShowElementsPage(); };
             ShowSourcePage();
             ShowElementsPage();
             UpdateStatus();
@@ -147,6 +159,21 @@ namespace AnalizadorFase1
             analyzeButton.Click += AnalyzeCurrentFile;
             row.Controls.Add(analyzeButton);
 
+            ConfigureZoomButton(_zoomOutButton, "A-", "zoomOutButton", 42);
+            _zoomOutButton.Click += delegate { ChangeZoom(-ZoomStepPercent); };
+            row.Controls.Add(_zoomOutButton);
+
+            ConfigureZoomButton(_zoomResetButton, "100%", "zoomResetButton", 58);
+            _zoomResetButton.Click += delegate { SetZoom(100); };
+            row.Controls.Add(_zoomResetButton);
+
+            ConfigureZoomButton(_zoomInButton, "A+", "zoomInButton", 42);
+            _zoomInButton.Click += delegate { ChangeZoom(ZoomStepPercent); };
+            row.Controls.Add(_zoomInButton);
+            _toolTip.SetToolTip(_zoomOutButton, "Reducir texto");
+            _toolTip.SetToolTip(_zoomResetButton, "Restablecer zoom al 100%");
+            _toolTip.SetToolTip(_zoomInButton, "Ampliar texto");
+
             _fileLabel.Text = "Selecciona un archivo fuente";
             _fileLabel.ForeColor = Color.White;
             _fileLabel.AutoEllipsis = true;
@@ -182,8 +209,8 @@ namespace AnalizadorFase1
             _sourceView.Dock = DockStyle.Fill;
             _sourceView.Multiline = true;
             _sourceView.ReadOnly = true;
-            _sourceView.WordWrap = false;
-            _sourceView.ScrollBars = ScrollBars.Both;
+            _sourceView.WordWrap = true;
+            _sourceView.ScrollBars = ScrollBars.None;
             _sourceView.BackColor = Color.White;
             _sourceView.ForeColor = Color.FromArgb(23, 43, 77);
             _sourceView.Font = new Font("Consolas", 10F, FontStyle.Regular, GraphicsUnit.Point);
@@ -211,6 +238,7 @@ namespace AnalizadorFase1
             layout.Controls.Add(_elementsPageLabel, 0, 0);
 
             _elementsGrid.Dock = DockStyle.Fill;
+            _elementsGrid.ScrollBars = ScrollBars.None;
             _elementsGrid.ReadOnly = true;
             _elementsGrid.AllowUserToAddRows = false;
             _elementsGrid.AllowUserToDeleteRows = false;
@@ -299,6 +327,47 @@ namespace AnalizadorFase1
             return button;
         }
 
+        private static void ConfigureZoomButton(Button button, string text, string name, int width)
+        {
+            button.Text = text;
+            button.Name = name;
+            button.Width = width;
+            button.Height = 36;
+            button.Margin = new Padding(0, 1, 5, 1);
+            button.FlatStyle = FlatStyle.Flat;
+            button.FlatAppearance.BorderSize = 0;
+            button.BackColor = Color.FromArgb(70, 110, 145);
+            button.ForeColor = Color.White;
+            button.Font = new Font("Segoe UI", 8.5F, FontStyle.Bold);
+            button.Cursor = Cursors.Hand;
+        }
+
+        private void ChangeZoom(int change)
+        {
+            SetZoom(_zoomPercent + change);
+        }
+
+        private void SetZoom(int zoomPercent)
+        {
+            _zoomPercent = Math.Max(MinimumZoomPercent, Math.Min(MaximumZoomPercent, zoomPercent));
+            float scale = _zoomPercent / 100F;
+            _sourceView.Font = new Font("Consolas", 10F * scale, FontStyle.Regular, GraphicsUnit.Point);
+            _elementsGrid.DefaultCellStyle.Font = new Font("Consolas", 9.5F * scale, FontStyle.Regular, GraphicsUnit.Point);
+            _elementsGrid.ColumnHeadersDefaultCellStyle.Font = new Font("Segoe UI", 9F * scale, FontStyle.Bold, GraphicsUnit.Point);
+
+            _elementsGrid.ColumnHeadersHeight = Math.Max(26, (int)Math.Ceiling(26F * scale));
+            int rowHeight = Math.Max(24, (int)Math.Ceiling(24F * scale));
+            _elementsGrid.RowTemplate.Height = rowHeight;
+            foreach (DataGridViewRow row in _elementsGrid.Rows)
+                row.Height = rowHeight;
+
+            _zoomResetButton.Text = _zoomPercent.ToString() + "%";
+            _zoomOutButton.Enabled = _zoomPercent > MinimumZoomPercent;
+            _zoomInButton.Enabled = _zoomPercent < MaximumZoomPercent;
+            ShowSourcePage();
+            ShowElementsPage();
+        }
+
         private void OpenFile(object sender, EventArgs e)
         {
             using (OpenFileDialog dialog = new OpenFileDialog())
@@ -363,24 +432,25 @@ namespace AnalizadorFase1
 
         private void ChangeSourcePage(int change)
         {
-            int count = AnalysisCore.PageCount(_sourceLines.Length, SourceLinesPerPage);
+            int count = BuildSourcePageStarts().Count;
             _sourcePage = Math.Max(0, Math.Min(_sourcePage + change, Math.Max(0, count - 1)));
             ShowSourcePage();
         }
 
         private void ChangeElementsPage(int change)
         {
-            int count = AnalysisCore.PageCount(_elements.Count, ElementsPerPage);
+            int count = AnalysisCore.PageCount(_elements.Count, GetElementsPerPage());
             _elementsPage = Math.Max(0, Math.Min(_elementsPage + change, Math.Max(0, count - 1)));
             ShowElementsPage();
         }
 
         private void ShowSourcePage()
         {
-            int total = Math.Max(1, AnalysisCore.PageCount(_sourceLines.Length, SourceLinesPerPage));
+            List<int> pageStarts = BuildSourcePageStarts();
+            int total = Math.Max(1, pageStarts.Count);
             _sourcePage = Math.Max(0, Math.Min(_sourcePage, total - 1));
-            int start = _sourcePage * SourceLinesPerPage;
-            int end = Math.Min(start + SourceLinesPerPage, _sourceLines.Length);
+            int start = pageStarts[_sourcePage];
+            int end = _sourcePage + 1 < pageStarts.Count ? pageStarts[_sourcePage + 1] : _sourceLines.Length;
             StringBuilder visible = new StringBuilder();
             for (int i = start; i < end; i++)
             {
@@ -400,22 +470,74 @@ namespace AnalizadorFase1
             _sourceNext.Enabled = _sourcePage + 1 < total;
         }
 
+        private List<int> BuildSourcePageStarts()
+        {
+            List<int> starts = new List<int>();
+            starts.Add(0);
+            if (_sourceLines.Length == 0) return starts;
+
+            int availableWidth = Math.Max(1, _sourceView.ClientSize.Width - 8);
+            int availableHeight = Math.Max(1, _sourceView.ClientSize.Height - 4);
+            int lineHeight = Math.Max(1, TextRenderer.MeasureText("Mg", _sourceView.Font).Height);
+            int maximumVisualRows = Math.Max(1, availableHeight / lineHeight);
+            int linesOnPage = 0;
+            int visualRowsOnPage = 0;
+
+            for (int i = 0; i < _sourceLines.Length; i++)
+            {
+                Size measured = TextRenderer.MeasureText(
+                    _sourceLines[i],
+                    _sourceView.Font,
+                    new Size(availableWidth, Int32.MaxValue),
+                    TextFormatFlags.WordBreak | TextFormatFlags.TextBoxControl | TextFormatFlags.NoPadding);
+                int visualRows = Math.Max(1, (measured.Height + lineHeight - 1) / lineHeight);
+
+                if (linesOnPage > 0 &&
+                    (linesOnPage >= SourceLinesPerPage || visualRowsOnPage + visualRows > maximumVisualRows))
+                {
+                    starts.Add(i);
+                    linesOnPage = 0;
+                    visualRowsOnPage = 0;
+                }
+
+                linesOnPage++;
+                visualRowsOnPage += visualRows;
+            }
+
+            return starts;
+        }
+
         private void ShowElementsPage()
         {
-            int total = Math.Max(1, AnalysisCore.PageCount(_elements.Count, ElementsPerPage));
+            int elementsPerPage = GetElementsPerPage();
+            int total = Math.Max(1, AnalysisCore.PageCount(_elements.Count, elementsPerPage));
             _elementsPage = Math.Max(0, Math.Min(_elementsPage, total - 1));
             _elementsGrid.Rows.Clear();
-            List<Lexeme> page = AnalysisCore.GetPage(_elements, _elementsPage, ElementsPerPage);
+            List<Lexeme> page = AnalysisCore.GetPage(_elements, _elementsPage, elementsPerPage);
             foreach (Lexeme item in page)
                 _elementsGrid.Rows.Add(item.Number, item.Text, item.Type);
 
             if (String.IsNullOrEmpty(_filePath))
                 _elementsPageLabel.Text = "Los elementos aparecer\u00e1n al abrir un archivo .ens.";
+            else if (_elements.Count == 0)
+                _elementsPageLabel.Text = "P\u00e1gina 1 de 1 | 0 elementos encontrados";
             else
-                _elementsPageLabel.Text = String.Format("P\u00e1gina {0} de {1} | {2} elementos numerados",
-                    _elementsPage + 1, total, _elements.Count);
+            {
+                int firstNumber = _elementsPage * elementsPerPage + 1;
+                int lastNumber = Math.Min(firstNumber + page.Count - 1, _elements.Count);
+                _elementsPageLabel.Text = String.Format("P\u00e1gina {0} de {1} | Elementos {2} a {3} de {4}",
+                    _elementsPage + 1, total, firstNumber, lastNumber, _elements.Count);
+            }
             _elementsPrevious.Enabled = _elementsPage > 0;
             _elementsNext.Enabled = _elementsPage + 1 < total;
+        }
+
+        private int GetElementsPerPage()
+        {
+            int availableHeight = _elementsGrid.ClientSize.Height - _elementsGrid.ColumnHeadersHeight - 6;
+            int rowHeight = Math.Max(1, _elementsGrid.RowTemplate.Height);
+            int rowsThatFit = Math.Max(1, availableHeight / rowHeight);
+            return Math.Min(ElementsPerPage, rowsThatFit);
         }
 
         private void UpdateStatus()
