@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.IO;
 using System.Reflection;
 using System.Text;
@@ -8,8 +9,10 @@ using AnalizadorFase1;
 
 internal static class GuiSmokeTests
 {
+    private static int _failed;
+
     [STAThread]
-    private static void Main()
+    private static int Main()
     {
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
@@ -29,14 +32,25 @@ internal static class GuiSmokeTests
             Assert(grids.Count == 1 && grids[0].Columns.Count == 3, "la lista debe mostrar numero, elemento y tipo");
             Assert(grids[0].ScrollBars == ScrollBars.None, "la lista se muestra paginada sin barras de desplazamiento");
             Assert(textBoxes.Count == 1 && textBoxes[0].ReadOnly, "el archivo fuente debe mostrarse en un panel de solo lectura");
-            Assert(textBoxes[0].ScrollBars == ScrollBars.None && textBoxes[0].WordWrap,
-                "las instrucciones se muestran paginadas sin barras de desplazamiento");
+            Assert(textBoxes[0].ScrollBars == ScrollBars.Vertical && textBoxes[0].WordWrap,
+                "la paginacion permite recorrer una linea mayor que la pantalla");
 
-            VerifyZoom(form, grids[0], textBoxes[0]);
-            VerifyIndependentPagination(form, grids[0], textBoxes[0]);
-            VerifySourceReflowsOnZoom(form, textBoxes[0]);
+            Run("zoom", delegate { VerifyZoom(form, grids[0], textBoxes[0]); });
+            Run("paginacion independiente", delegate { VerifyIndependentPagination(form, grids[0], textBoxes[0]); });
+            Run("reajuste de fuente", delegate { VerifySourceReflowsOnZoom(form, textBoxes[0]); });
+            Run("barra visible en ventana minima", delegate { VerifyToolbarFits(form); });
+            Run("linea mayor que una pagina", delegate { VerifyOversizedLine(form, textBoxes[0]); });
+            Run("archivo vacio y codificaciones", delegate { VerifyFileContents(form, textBoxes[0]); });
+            Run("lineas vacias de la fuente", delegate { VerifyEmptyLines(form, textBoxes[0]); });
         }
-        Console.WriteLine("OK: inicio, controles y paginacion independiente de la ventana");
+        Console.WriteLine("Interfaz: {0} fallos", _failed);
+        return _failed == 0 ? 0 : 1;
+    }
+
+    private static void Run(string name, Action action)
+    {
+        try { action(); Console.WriteLine("OK: " + name); }
+        catch (Exception ex) { _failed++; Console.WriteLine("FALLO: " + name + ": " + ex); }
     }
 
     private static void VerifyTeamTwoInstructions(MainForm form)
@@ -90,7 +104,7 @@ internal static class GuiSmokeTests
 
     private static void VerifyIndependentPagination(MainForm form, DataGridView grid, TextBox sourceView)
     {
-        string directory = Path.Combine(Path.GetTempPath(), "analizador-fase1-gui-tests");
+        string directory = Path.Combine(Path.GetTempPath(), "AnalizadorFase1-gui-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         string path = Path.Combine(directory, "paginacion.ens");
         List<string> lines = new List<string>();
@@ -160,8 +174,8 @@ internal static class GuiSmokeTests
         int pagesAt100 = ((List<int>)buildPageStarts.Invoke(form, null)).Count;
         setZoom.Invoke(form, new object[] { 150 });
         int pagesAt150 = ((List<int>)buildPageStarts.Invoke(form, null)).Count;
-        Assert(sourceView.ScrollBars == ScrollBars.None && sourceView.WordWrap,
-            "el codigo se envuelve sin barras de desplazamiento");
+        Assert(sourceView.ScrollBars == ScrollBars.Vertical && sourceView.WordWrap,
+            "el codigo se envuelve y permite recorrer una linea extensa");
         Assert(pagesAt150 > pagesAt100, "las paginas de instrucciones se reajustan cuando aumenta el zoom");
     }
 
@@ -169,6 +183,68 @@ internal static class GuiSmokeTests
     {
         FieldInfo field = typeof(MainForm).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic);
         return field.GetValue(form) as T;
+    }
+
+    private static void VerifyToolbarFits(MainForm form)
+    {
+        Size originalSize = form.Size;
+        try
+        {
+            form.Size = form.MinimumSize;
+            form.PerformLayout();
+            foreach (string name in new string[] { "_fileLabel", "_statusLabel" })
+            {
+                Label label = GetField<Label>(form, name);
+                Point location = Point.Empty;
+                for (Control ancestor = label; ancestor != form; ancestor = ancestor.Parent)
+                    location.Offset(ancestor.Location);
+                Assert(location.X >= 0 && location.X + label.Width <= form.ClientSize.Width,
+                    name + " dentro de ventana: x=" + location.X + ", ancho=" + label.Width + ", cliente=" + form.ClientSize.Width + ", padre=" + label.Parent.Size);
+            }
+        }
+        finally { form.Size = originalSize; form.PerformLayout(); }
+    }
+
+    private static void VerifyOversizedLine(MainForm form, TextBox sourceView)
+    {
+        string line = String.Join(" ", new string('a', 8000).ToCharArray());
+        typeof(MainForm).GetField("_sourceLines", BindingFlags.Instance | BindingFlags.NonPublic).SetValue(form, new string[] { line });
+        typeof(MainForm).GetMethod("ShowSourcePage", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, null);
+        Assert(sourceView.Text == line, "se conserva completa una linea muy larga");
+        Point last = sourceView.GetPositionFromCharIndex(sourceView.TextLength - 1);
+        Assert(last.Y < sourceView.ClientSize.Height || sourceView.ScrollBars == ScrollBars.Vertical || sourceView.ScrollBars == ScrollBars.Both,
+            "se puede llegar al final de una linea mayor que la altura de la pagina");
+    }
+
+    private static void VerifyFileContents(MainForm form, TextBox sourceView)
+    {
+        string directory = Path.Combine(Path.GetTempPath(), "AnalizadorFase1-encoding-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(directory);
+        string path = Path.Combine(directory, "contenido.ens");
+        MethodInfo load = typeof(MainForm).GetMethod("LoadFile", BindingFlags.Instance | BindingFlags.NonPublic);
+        try
+        {
+            foreach (Encoding encoding in new Encoding[] { new UTF8Encoding(false), Encoding.Unicode, Encoding.GetEncoding(1252) })
+            {
+                File.WriteAllText(path, "niño db 'áéíóú'", encoding);
+                load.Invoke(form, new object[] { path });
+                Assert(sourceView.Text == "niño db 'áéíóú'", "lectura de " + encoding.WebName);
+            }
+            File.WriteAllText(path, String.Empty);
+            load.Invoke(form, new object[] { path });
+            Assert(sourceView.Text.Length == 0, "fuente vacia");
+            Assert(GetField<Label>(form, "_sourcePageLabel").Text.Contains("Archivo vacío"), "informa que el archivo esta vacio");
+        }
+        finally { File.Delete(path); Directory.Delete(directory); }
+    }
+
+    private static void VerifyEmptyLines(MainForm form, TextBox sourceView)
+    {
+        typeof(MainForm).GetField("_sourceLines", BindingFlags.Instance | BindingFlags.NonPublic)
+            .SetValue(form, new string[] { "", "", "DB 0", "" });
+        typeof(MainForm).GetMethod("ShowSourcePage", BindingFlags.Instance | BindingFlags.NonPublic).Invoke(form, null);
+        Assert(sourceView.Text == Environment.NewLine + Environment.NewLine + "DB 0" + Environment.NewLine,
+            "la vista conserva las lineas vacias iniciales y finales");
     }
 
     private static void CreateHandles(Control parent)

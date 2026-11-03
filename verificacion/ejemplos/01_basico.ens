@@ -7,5 +7,5 @@ contador dw 25
 inicio:
     mov ax, 25       ; MOV no está asignado al equipo 2: se muestra como símbolo
     cbw              ; instrucción asignada al equipo 2
-    int 21h
+    int 021h
     ret              ; RET no está asignado al equipo 2: se muestra como símbolo

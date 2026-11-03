@@ -88,8 +88,9 @@ namespace AnalizadorFase1
             TableLayoutPanel root = new TableLayoutPanel();
             root.Dock = DockStyle.Fill;
             root.ColumnCount = 1;
+            root.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             root.RowCount = 2;
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 58F));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 90F));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
             Controls.Add(root);
 
@@ -114,7 +115,7 @@ namespace AnalizadorFase1
             split.Panel1.Controls.Add(sourceGroup);
 
             GroupBox elementsGroup = new GroupBox();
-            elementsGroup.Text = "2 y 3. Separaci\u00f3n e identificaci\u00f3n";
+            elementsGroup.Text = "2. Separaci\u00f3n e identificaci\u00f3n";
             elementsGroup.Dock = DockStyle.Fill;
             elementsGroup.Padding = new Padding(10);
             elementsGroup.ForeColor = Color.FromArgb(23, 50, 77);
@@ -133,7 +134,8 @@ namespace AnalizadorFase1
             toolbar.Padding = new Padding(12, 8, 12, 8);
 
             FlowLayoutPanel row = new FlowLayoutPanel();
-            row.Dock = DockStyle.Fill;
+            row.Dock = DockStyle.Top;
+            row.Height = 40;
             row.WrapContents = false;
             row.FlowDirection = FlowDirection.LeftToRight;
             row.BackColor = toolbar.BackColor;
@@ -174,21 +176,25 @@ namespace AnalizadorFase1
             _toolTip.SetToolTip(_zoomResetButton, "Restablecer zoom al 100%");
             _toolTip.SetToolTip(_zoomInButton, "Ampliar texto");
 
+            Panel information = new Panel();
+            information.Dock = DockStyle.Bottom;
+            information.Height = 24;
+            toolbar.Controls.Add(information);
+
             _fileLabel.Text = "Selecciona un archivo fuente";
             _fileLabel.ForeColor = Color.White;
             _fileLabel.AutoEllipsis = true;
-            _fileLabel.Width = 300;
-            _fileLabel.Height = 38;
+            _fileLabel.Dock = DockStyle.Fill;
             _fileLabel.TextAlign = ContentAlignment.MiddleLeft;
-            row.Controls.Add(_fileLabel);
+            information.Controls.Add(_fileLabel);
             _toolTip.SetToolTip(_fileLabel, "La aplicaci\u00f3n permite abrir archivos .ens desde cualquier carpeta.");
 
             _statusLabel.ForeColor = Color.FromArgb(217, 229, 239);
             _statusLabel.AutoEllipsis = true;
-            _statusLabel.Width = 310;
-            _statusLabel.Height = 38;
+            _statusLabel.Width = 350;
+            _statusLabel.Dock = DockStyle.Right;
             _statusLabel.TextAlign = ContentAlignment.MiddleRight;
-            row.Controls.Add(_statusLabel);
+            information.Controls.Add(_statusLabel);
             return toolbar;
         }
 
@@ -197,6 +203,7 @@ namespace AnalizadorFase1
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
             layout.ColumnCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             layout.RowCount = 3;
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -210,7 +217,7 @@ namespace AnalizadorFase1
             _sourceView.Multiline = true;
             _sourceView.ReadOnly = true;
             _sourceView.WordWrap = true;
-            _sourceView.ScrollBars = ScrollBars.None;
+            _sourceView.ScrollBars = ScrollBars.Vertical;
             _sourceView.BackColor = Color.White;
             _sourceView.ForeColor = Color.FromArgb(23, 43, 77);
             _sourceView.Font = new Font("Consolas", 10F, FontStyle.Regular, GraphicsUnit.Point);
@@ -228,6 +235,7 @@ namespace AnalizadorFase1
             TableLayoutPanel layout = new TableLayoutPanel();
             layout.Dock = DockStyle.Fill;
             layout.ColumnCount = 1;
+            layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100F));
             layout.RowCount = 3;
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 30F));
             layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100F));
@@ -406,7 +414,8 @@ namespace AnalizadorFase1
 
                 _filePath = path;
                 _source = source;
-                _sourceLines = source.Split(new string[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
+                _sourceLines = source.Length == 0 ? new string[0] :
+                    source.Split(new string[] { "\r\n", "\n", "\r" }, StringSplitOptions.None);
                 _fileLabel.Text = Path.GetFileName(path);
                 _toolTip.SetToolTip(_fileLabel, path);
                 _sourcePage = 0;
@@ -454,7 +463,7 @@ namespace AnalizadorFase1
             StringBuilder visible = new StringBuilder();
             for (int i = start; i < end; i++)
             {
-                if (visible.Length > 0) visible.AppendLine();
+                if (i > start) visible.AppendLine();
                 visible.Append(_sourceLines[i]);
             }
             _sourceView.Text = visible.ToString();

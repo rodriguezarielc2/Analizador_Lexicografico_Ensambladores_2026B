@@ -2,14 +2,14 @@
 .data segment
 relleno db 4 dup('A')
 tabla dw 3 dup(0)
-numero_decimal db 42
-numero_hex db 0FFh
-numero_bin db 101b
-numero_hex_prefijo dw 0x2A
+numdec db 42
+numhex db 0FFh
+numbin db 10101010b
+numword dw 0002AH
 caracter db 'Z'
 texto db "A, B; C$"
 .code segment
 inicio:
     mov al, byte ptr [bx + si]
     mov ax, word ptr [bp + 4]
-    and al, 0Fh
+    and al, 00Fh

@@ -9,15 +9,15 @@ inicio:
     aaa
     pop ax
     idiv bx
-    int 21h
-    and al, 0Fh
+    int 021h
+    and al, 00Fh
     adc ax, 1
     lea si, dato
     les bx, destino
     jnz continuar
     jz terminar
     loopnz ciclo
-    jge mayor_igual
+    jge mayor_ig
     jna no_mayor
     jnl no_menor
     jb menor

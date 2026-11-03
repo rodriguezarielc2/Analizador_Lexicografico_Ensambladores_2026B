@@ -1,18 +1,10 @@
-# Python build products and caches
-__pycache__/
-*.py[cod]
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-*.egg-info/
-
-# Local environments
-.venv/
-venv/
-env/
-
-# Packaging output and generated executables
+# Productos generados
 dist/
 build/
-*.spec
-Fase1/dist/
+*.exe
+*.pdb
+
+# Configuración local del editor
+.vs/
+*.user
+*.suo
